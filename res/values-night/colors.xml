@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#7B8FD4</color>
+    <color name="primary_dark">#0C0E14</color>
+    <color name="accent">#2DD4AA</color>
+
+    <color name="bg_page">#0C0E14</color>
+    <color name="bg_card">#171B25</color>
+    <color name="bg_header">#12151D</color>
+
+    <color name="text_primary">#E6EAF4</color>
+    <color name="text_secondary">#7A8499</color>
+    <color name="text_on_primary">#FFFFFF</color>
+
+    <color name="btn_normal">#10B981</color>
+    <color name="btn_focused">#34D399</color>
+    <color name="btn_pressed">#059669</color>
+    <color name="btn_disabled">#1A2332</color>
+    <color name="btn_outline_border">#3A4560</color>
+    <color name="btn_outline_text">#B8BFD0</color>
+    <color name="btn_outline_focused_bg">#1A1F2E</color>
+
+    <color name="item_focused_bg">#181C28</color>
+    <color name="item_focused_border">#7B8FD4</color>
+    <color name="item_pressed_bg">#1E2230</color>
+
+    <color name="card_border">#252838</color>
+</resources>

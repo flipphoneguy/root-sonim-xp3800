@@ -1,0 +1,6 @@
+build/
+libs/
+tmp/
+*.idsig
+*.apk
+root_xp3.zip

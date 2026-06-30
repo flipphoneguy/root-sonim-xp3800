@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Root Manager</string>
+    <string name="btn_info">\u24D8</string>
+
+    <!-- Main screen -->
+    <string name="status_installed">Root: INSTALLED</string>
+    <string name="status_not_installed">Root: NOT INSTALLED</string>
+    <string name="status_hint">Tap to toggle</string>
+    <string name="btn_install_apk">Install APK / XAPK</string>
+    <string name="blacklist_title">Manage Blacklist</string>
+    <string name="search_hint">Search apps\u2026</string>
+    <string name="filter_user">User</string>
+    <string name="filter_system">System</string>
+    <string name="filter_all">All</string>
+    <string name="apps_loading">Loading apps\u2026</string>
+    <string name="apps_empty">No apps found</string>
+    <string name="pick_file">Select APK or XAPK</string>
+    <string name="no_root">Root is not installed. Install root first.</string>
+    <string name="installing">Installing\u2026</string>
+    <string name="install_success">Installed successfully</string>
+
+    <!-- Install handler -->
+    <string name="install_confirm_title">Install Package</string>
+    <string name="install_confirm_body">Install this application using root?</string>
+    <string name="btn_yes">Install</string>
+    <string name="btn_no">Cancel</string>
+
+    <!-- Info screen -->
+    <string name="info_title">About</string>
+    <string name="info_boot_title">Boot Settings</string>
+    <string name="check_boot">Install root on boot</string>
+    <string name="info_update_title">Update</string>
+    <string name="info_update_body">Check for a newer version on GitHub.</string>
+    <string name="btn_check_update">Check for update</string>
+    <string name="info_links_title">Links</string>
+    <string name="btn_github_profile">GitHub Profile</string>
+    <string name="btn_app_repo">App Repository</string>
+
+    <string name="update_checking">Checking\u2026</string>
+    <string name="update_up_to_date">Already on the latest version (%s)</string>
+    <string name="update_downloading">Downloading v%s\u2026</string>
+    <string name="update_download_failed">Download failed: %s</string>
+    <string name="update_ready">Update to v%s?</string>
+    <string name="update_confirm_body">A new version (v%s) is available. Install now?</string>
+    <string name="update_installing">Installing\u2026</string>
+    <string name="update_install_failed">Install failed: %s</string>
+    <string name="update_no_release">No release found</string>
+    <string name="update_success">Updated successfully</string>
+
+    <string name="info_theme_title">Theme</string>
+    <string name="theme_system">System Default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+</resources>

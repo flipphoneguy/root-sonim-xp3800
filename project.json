@@ -1,0 +1,8 @@
+{
+    "package": "com.flipphoneguy.root.xp3",
+    "name": "Root Manager",
+    "min_sdk": 23,
+    "target_sdk": 35,
+    "repo": "flipphoneguy/root-sonim-xp3800",
+    "github_profile": "https://github.com/flipphoneguy"
+}
