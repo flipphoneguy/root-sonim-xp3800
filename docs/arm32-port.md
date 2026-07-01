@@ -235,7 +235,7 @@ With the two-phase leak and the clobber primitive working, the exploit chains th
 - Sets all 5 capability sets to `{0xFFFFFFFF, 0xFFFFFFFF}` (all capabilities)
 - Clears thread_info flags (disables seccomp)
 - Writes 0 to `selinux_enforcing` (disables SELinux enforcement)
-- Spawns a root shell via `nsenter -t 1 -m` (escapes into PID 1's mount namespace)
+- Enters PID 1's mount namespace via `setns()` (escapes the app's sandboxed filesystem — see [The Daemon](daemon.md) for how this is used)
 
 ---
 

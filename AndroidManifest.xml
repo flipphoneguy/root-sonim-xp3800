@@ -11,9 +11,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
     <application
         android:label="@string/app_name"
@@ -37,7 +35,6 @@
 
         <activity
             android:name=".InstallActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:exported="true"
             android:excludeFromRecents="true">
             <intent-filter>
@@ -51,17 +48,7 @@
             </intent-filter>
         </activity>
 
-        <receiver
-            android:name=".BootReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-            </intent-filter>
-        </receiver>
-
-        <provider
+<provider
             android:name=".ApkFileProvider"
             android:authorities="com.flipphoneguy.root.xp3.fileprovider"
             android:exported="false"

@@ -150,7 +150,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean isRootInstalled() {
-        return new File("/sbin/su").exists();
+        return new File("/system/bin/su").exists();
     }
 
     private void toggleRoot() {
@@ -197,7 +197,6 @@ public class MainActivity extends Activity {
 
     private void copyAssets() {
         copyFile("su");
-        copyFile("nsenter");
         copyFile("install.sh");
         copyFile("uninstall.sh");
     }

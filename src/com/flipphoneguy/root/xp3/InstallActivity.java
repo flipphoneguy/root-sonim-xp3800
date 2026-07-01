@@ -1,11 +1,13 @@
 package com.flipphoneguy.root.xp3;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
@@ -13,8 +15,14 @@ import java.io.File;
 public class InstallActivity extends Activity {
 
     @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(ThemeHelper.wrap(newBase));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_install);
 
         Intent intent = getIntent();
         Uri data = intent.getData();
@@ -28,37 +36,35 @@ public class InstallActivity extends Activity {
             return;
         }
 
-        if (!new File("/sbin/su").exists()) {
+        if (!new File("/system/bin/su").exists()) {
             Toast.makeText(this, R.string.no_root, Toast.LENGTH_LONG).show();
             finish();
             return;
         }
 
         final Uri uri = data;
-        new AlertDialog.Builder(this)
-            .setTitle(R.string.install_confirm_title)
-            .setMessage(R.string.install_confirm_body)
-            .setPositiveButton(R.string.btn_yes, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface dialog, int which) {
-                    doInstall(uri);
-                }
-            })
-            .setNegativeButton(R.string.btn_no, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface dialog, int which) {
-                    finish();
-                }
-            })
-            .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                @Override public void onCancel(DialogInterface dialog) {
-                    finish();
-                }
-            })
-            .show();
+        final TextView statusText = (TextView) findViewById(R.id.install_status);
+        final LinearLayout buttons = (LinearLayout) findViewById(R.id.install_buttons);
+
+        findViewById(R.id.btn_cancel).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                finish();
+            }
+        });
+
+        findViewById(R.id.btn_install).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                buttons.setVisibility(View.GONE);
+                statusText.setText(R.string.installing);
+                statusText.setVisibility(View.VISIBLE);
+                doInstall(uri, statusText);
+            }
+        });
+
+        findViewById(R.id.btn_install).requestFocus();
     }
 
-    private void doInstall(final Uri uri) {
-        Toast.makeText(this, R.string.installing, Toast.LENGTH_SHORT).show();
-
+    private void doInstall(final Uri uri, final TextView statusText) {
         new Thread(new Runnable() {
             @Override public void run() {
                 final String result = ApkInstaller.installFromUri(

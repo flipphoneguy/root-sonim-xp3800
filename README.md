@@ -1,12 +1,54 @@
 # Root Sonim XP3800
 
-Root access for the Sonim XP3800 (XP3plus). Two paths are available — choose whichever fits your situation.
+Root access for the Sonim XP3800. Two methods are available — choose whichever fits your situation.
 
-## Two paths to root
+## Root Manager App
 
-### Option 1: EDL/QFIL (flash a patched boot image)
+The Root Manager app exploits CVE-2019-2215 (a binder use-after-free kernel vulnerability) to gain root directly on the device. No computer, no bootloader unlock, no flashing required. The exploit binary is a ground-up ARM32 port targeting the XP3800's 3.18.71 kernel — every kernel structure offset was derived from reverse engineering the device's kernel binary.
 
-This is the more traditional method. You extract the stock boot image from your device, patch it with Magisk, and flash it back via Qualcomm's EDL mode and QFIL.
+Install the APK via ADB (the XP3800 blocks APK installation from the device itself), tap Install, and root is permanently written to `/system/bin/su`. Root persists across reboots with no boot service or background process — the binary is just there, like any other system command.
+
+```sh
+adb install RootManager.apk
+```
+
+### How it works
+
+The first time `su` is invoked after a boot, it runs the kernel exploit (~1.2 seconds) and spawns a persistent root daemon. Every subsequent `su` call connects to the daemon instantly (~0.13 seconds) — no exploit, no kernel manipulation. The daemon enters PID 1's mount namespace via `setns()`, so commands have full filesystem access including `/system`.
+
+The exploit is serialized with `flock()` to prevent concurrent runs (which would panic the kernel) and retries up to 3 times on failure.
+
+### Features
+
+- **Persistent root** — `su` is installed to `/system/bin` permanently. No tmpfs, no boot receiver, survives reboots and factory resets.
+- **Writable /system** — The XP3800 has no dm-verity. `/system` is plain ext4, freely remountable read-write. Changes persist across reboots.
+- **Root app installer** — Install APKs and split APKs (XAPK) using root, since the XP3800 blocks app installation without ADB. Also registers as a handler for APK files from file managers.
+- **Daemon architecture** — Exploit runs once per boot, daemon handles all subsequent requests. See [The Daemon](docs/daemon.md).
+- **Denylist** — Block specific apps from using `su`. Filter by User/System/All, search by name or package.
+- **Self-update** — Checks GitHub Releases for newer versions and installs via root.
+- **D-pad friendly** — Full keyboard/d-pad navigation with visible focus states.
+
+### Usage
+
+| Command | Description |
+| :--- | :--- |
+| `su` | Interactive root shell (preserves caller's environment) |
+| `su -c 'cmd'` | Run a command as root (uses system shell and PATH) |
+| `su cmd` | Same as `-c` |
+| `su -p -c 'cmd'` | Run a command preserving the caller's environment |
+| `su -s bash -c 'cmd'` | Specify shell |
+| `su --mount-master` | Accepted for compatibility (no-op — daemon already has full mount namespace) |
+| `su -v` | Verbose exploit output |
+
+### Access control
+
+The `su` binary has a built-in denylist. By default, any app can use `su` unless it's in the denylist. Manage the denylist from the app's main screen — check the box next to any app to block it.
+
+Termux and ADB shell (`uid 2000`) are always allowed regardless of the denylist. Wildcard entries like `com.example.*` are supported.
+
+## Magisk Method
+
+The alternative is flashing a patched boot image via Qualcomm's EDL mode and QFIL.
 
 **Important details:**
 
@@ -14,48 +56,17 @@ This is the more traditional method. You extract the stock boot image from your 
 - The boot image **must come from your device**. Pull it via EDL/QFIL, or use this app + `dd` once rooted. Do not download boot images from the internet — other variants or firmware versions may not match your device and could fail to boot.
 - If Magisk's file picker doesn't work on the XP3800 (it sometimes doesn't), try a different file manager app like FX, or patch the boot image from another phone that has Magisk 24.0.0 installed.
 
-### Option 2: Root Manager app (CVE-2019-2215, no PC needed)
+## Modifying /system
 
-This app exploits a kernel vulnerability to gain root directly on the device — no computer, no bootloader unlock, no flashing. Install the APK, tap to root. This is what the rest of this README covers.
+The XP3800 has **no dm-verity** — the `/system` partition is a plain ext4 filesystem with no integrity checking. The `androidboot.veritymode=enforcing` flag is set in the kernel cmdline but is a complete no-op: there are no dm-verity device mapper devices, no vbmeta partition, and no hash tree.
 
-## Root Manager
+```sh
+su -c "mount -o remount,rw /system"
+# make your changes
+su -c "mount -o remount,ro /system"
+```
 
-The Root Manager app bundles a prebuilt exploit binary (`su`) targeting CVE-2019-2215 (Binder use-after-free), tuned for the XP3800's 3.18.71 ARM32 kernel. On install:
-
-1. The exploit gains kernel R/W and escalates to uid 0
-2. Mounts a tmpfs at `/sbin` and copies `su` + `nsenter` there
-3. `/sbin/su` is now available system-wide for root access
-
-Since `/sbin` lives in RAM (tmpfs), root is lost on reboot. The boot receiver re-runs the exploit automatically on each boot to make it persistent.
-
-### Features
-
-- **Root toggle** — Tap the status card to install or uninstall root
-- **Boot persistence** — Automatically re-roots on device boot
-- **App blacklist** — Block specific apps from using `su`. Filter by User/System/All, search by name or package.
-- **APK/XAPK installer** — Install APKs and split APKs (XAPK) using root. Also registers as a handler for APK files from file managers.
-- **Self-update** — Checks GitHub Releases for newer versions and installs via root
-- **D-pad friendly** — Full keyboard/d-pad navigation with visible focus states
-
-### Usage
-
-The app installs `su` at `/sbin/su`. Any app or terminal can use it:
-
-| Command | Description |
-| :--- | :--- |
-| `su` | Root shell |
-| `su -c "cmd"` | Run a command as root and exit |
-| `su cmd` | Same as above |
-| `su -s bash` | Specify shell (default is `$SHELL`) |
-| `su -v` | Verbose output |
-
-### Access control
-
-The `su` binary has a built-in whitelist/blacklist system:
-
-- **Blacklist mode** (default): Any app can use `su` unless it's in the blacklist. Manage the blacklist directly from the app's main screen.
-- **Whitelist mode**: If a `whitelist.txt` file exists and is non-empty in the app's data directory, only listed apps can use `su`. All others are denied.
-- Termux and ADB shell are always allowed regardless of list configuration.
+Changes persist across reboots. **Be careful what you delete** — removing the wrong system file can bootloop the device.
 
 ## Build
 
@@ -69,14 +80,15 @@ Output: `RootManager.apk`
 
 ## Technical details
 
-The exploit and its ARM32 port are documented in detail:
+The exploit and its implementation are documented in detail:
 
-- [CVE-2019-2215: The Exploit Explained](docs/CVE-2019-2215.md) — Full background on the vulnerability and escalation chain
+- [CVE-2019-2215: The Exploit Explained](docs/CVE-2019-2215.md) — The vulnerability, every background concept, and the full escalation chain from UAF through root
 - [The ARM32 Port](docs/arm32-port.md) — What breaks on 32-bit ARM and how it's fixed
+- [The Daemon](docs/daemon.md) — How the daemon provides persistent root without re-running the exploit
 
-## Warning
+## Disclaimer
 
-**Do not use root to modify `/system` or other protected partitions.** Doing so can permanently brick the device. If you don't know what that means, only use root for installing apps. Use at your own risk — the author assumes no responsibility for bricked devices.
+This software is provided as-is with no warranty. The author assumes no responsibility for bricked, broken, or otherwise damaged devices. Use at your own risk.
 
 ## License
 

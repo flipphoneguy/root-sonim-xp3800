@@ -84,12 +84,12 @@ public final class ApkInstaller {
 
     public static void installRoot(File apk) throws Exception {
         String tmp = "/data/local/tmp/update.apk";
-        String cmd = "cp " + apk.getAbsolutePath() + " " + tmp
-            + " && chmod 644 " + tmp
-            + " && pm install -r " + tmp
-            + " && rm -f " + tmp;
+        String cmd = "cp " + shellQuote(apk.getAbsolutePath()) + " " + shellQuote(tmp)
+            + " && chmod 644 " + shellQuote(tmp)
+            + " && pm install -r " + shellQuote(tmp)
+            + " && rm -f " + shellQuote(tmp);
 
-        ProcessBuilder pb = new ProcessBuilder("/sbin/su", "-c", cmd);
+        ProcessBuilder pb = new ProcessBuilder("/system/bin/su", "-c", cmd);
         pb.redirectErrorStream(true);
         Process proc = pb.start();
         String output = readStream(proc.getInputStream());
@@ -107,11 +107,28 @@ public final class ApkInstaller {
         File tempFile = null;
         try {
             tempFile = new File(ctx.getCacheDir(), "install_pkg");
-            try (InputStream in = ctx.getContentResolver().openInputStream(uri);
-                 FileOutputStream out = new FileOutputStream(tempFile)) {
-                byte[] buf = new byte[65536];
-                int n;
-                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+            String dst = tempFile.getAbsolutePath();
+
+            if ("file".equals(uri.getScheme())) {
+                rootCopy(uri.getPath(), dst);
+            } else {
+                boolean copied = false;
+                String path = resolveContentPath(ctx, uri);
+                if (path != null) {
+                    try { rootCopy(path, dst); copied = true; }
+                    catch (Exception ignored) {}
+                }
+                if (!copied) {
+                    InputStream in = ctx.getContentResolver().openInputStream(uri);
+                    if (in == null) throw new Exception("Cannot open file");
+                    try (FileOutputStream out = new FileOutputStream(tempFile)) {
+                        byte[] buf = new byte[65536];
+                        int n;
+                        while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                    } finally {
+                        in.close();
+                    }
+                }
             }
 
             if (isXapk(uri, ctx, tempFile)) {
@@ -127,16 +144,38 @@ public final class ApkInstaller {
         }
     }
 
+    private static void rootCopy(String src, String dst) throws Exception {
+        String cmd = "cp " + shellQuote(src) + " " + shellQuote(dst)
+            + " && chmod 644 " + shellQuote(dst);
+        ProcessBuilder pb = new ProcessBuilder("/system/bin/su", "-c", cmd);
+        pb.redirectErrorStream(true);
+        Process proc = pb.start();
+        String output = readStream(proc.getInputStream());
+        if (proc.waitFor() != 0)
+            throw new Exception("Root copy failed: " + output.trim());
+    }
+
+    private static String resolveContentPath(Context ctx, Uri uri) {
+        try (android.database.Cursor c = ctx.getContentResolver().query(
+                uri, new String[]{"_data"}, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                String path = c.getString(0);
+                if (path != null && !path.isEmpty()) return path;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     // --- Single APK root install ---
 
     private static void installSingleApkRoot(File apk) throws Exception {
         String tmp = "/data/local/tmp/install.apk";
-        String cmd = "cp " + apk.getAbsolutePath() + " " + tmp
-            + " && chmod 644 " + tmp
-            + " && pm install -r " + tmp
-            + " && rm -f " + tmp;
+        String cmd = "cp " + shellQuote(apk.getAbsolutePath()) + " " + shellQuote(tmp)
+            + " && chmod 644 " + shellQuote(tmp)
+            + " && pm install -r " + shellQuote(tmp)
+            + " && rm -f " + shellQuote(tmp);
 
-        ProcessBuilder pb = new ProcessBuilder("/sbin/su", "-c", cmd);
+        ProcessBuilder pb = new ProcessBuilder("/system/bin/su", "-c", cmd);
         pb.redirectErrorStream(true);
         Process proc = pb.start();
         String output = readStream(proc.getInputStream());
@@ -191,17 +230,20 @@ public final class ApkInstaller {
             pw.println("mkdir -p $DEST");
 
             for (File apk : apks) {
-                pw.println("cp " + apk.getAbsolutePath() + " $DEST/" + apk.getName());
-                pw.println("chmod 644 $DEST/" + apk.getName());
+                String src = shellQuote(apk.getAbsolutePath());
+                String name = shellQuote(apk.getName());
+                pw.println("cp " + src + " $DEST/" + name);
+                pw.println("chmod 644 $DEST/" + name);
             }
 
             pw.println("CREATE_OUT=$(pm install-create -S " + totalSize + ")");
             pw.println("SESSION=$(echo \"$CREATE_OUT\" | grep -o '\\[.*\\]' | tr -d '[]')");
 
             for (File apk : apks) {
+                String name = shellQuote(apk.getName());
                 pw.println("pm install-write -S " + apk.length()
-                    + " $SESSION " + apk.getName()
-                    + " $DEST/" + apk.getName());
+                    + " $SESSION " + name
+                    + " $DEST/" + name);
             }
 
             pw.println("pm install-commit $SESSION");
@@ -211,7 +253,7 @@ public final class ApkInstaller {
             script.setExecutable(true, false);
 
             ProcessBuilder pb = new ProcessBuilder(
-                "/sbin/su", "-c", "sh " + script.getAbsolutePath());
+                "/system/bin/su", "-c", "sh " + script.getAbsolutePath());
             pb.redirectErrorStream(true);
             Process proc = pb.start();
             String output = readStream(proc.getInputStream());
@@ -270,6 +312,10 @@ public final class ApkInstaller {
             sb.append(line).append('\n');
         reader.close();
         return sb.toString();
+    }
+
+    private static String shellQuote(String s) {
+        return "'" + s.replace("'", "'\\''") + "'";
     }
 
     private static String fetchApi(String apiUrl) throws IOException {
