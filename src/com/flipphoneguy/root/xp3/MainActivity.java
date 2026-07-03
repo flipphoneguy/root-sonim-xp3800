@@ -1,7 +1,9 @@
 package com.flipphoneguy.root.xp3;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -44,6 +46,9 @@ public class MainActivity extends Activity {
     private static final int FILTER_ALL = 2;
 
     private TextView statusText;
+    private Button btnRemoveMdm;
+    private Button btnRestoreMdm;
+    private TextView mdmStatus;
     private EditText searchBox;
     private LinearLayout appListContainer;
     private TextView appsEmpty;
@@ -71,6 +76,9 @@ public class MainActivity extends Activity {
 
         pm = getPackageManager();
         statusText = (TextView) findViewById(R.id.statusText);
+        btnRemoveMdm = (Button) findViewById(R.id.btn_remove_mdm);
+        btnRestoreMdm = (Button) findViewById(R.id.btn_restore_mdm);
+        mdmStatus = (TextView) findViewById(R.id.mdm_status);
         searchBox = (EditText) findViewById(R.id.searchBox);
         appListContainer = (LinearLayout) findViewById(R.id.app_list_container);
         appsEmpty = (TextView) findViewById(R.id.apps_empty);
@@ -94,6 +102,18 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_install_apk).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 openFilePicker();
+            }
+        });
+
+        btnRemoveMdm.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                confirmRemoveMdm();
+            }
+        });
+
+        btnRestoreMdm.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                confirmRestoreMdm();
             }
         });
 
@@ -280,6 +300,85 @@ public class MainActivity extends Activity {
                         }
                     }
                 });
+            }
+        }).start();
+    }
+
+    // --- Remove Verizon MDM ---
+
+    private void setMdmStatus(final String text) {
+        mdmStatus.setVisibility(View.VISIBLE);
+        mdmStatus.setText(text);
+    }
+
+    private void confirmRemoveMdm() {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.remove_mdm_confirm_title)
+            .setMessage(R.string.remove_mdm_confirm_body)
+            .setPositiveButton(R.string.btn_yes, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface dialog, int which) {
+                    removeMdm();
+                }
+            })
+            .setNegativeButton(R.string.btn_no, null)
+            .show();
+    }
+
+    private void removeMdm() {
+        btnRemoveMdm.setEnabled(false);
+        btnRestoreMdm.setEnabled(false);
+        setMdmStatus(getString(R.string.remove_mdm_working));
+
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    MdmRemover.remove(getCacheDir());
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            setMdmStatus(getString(R.string.remove_mdm_failed,
+                                e.getMessage()));
+                            btnRemoveMdm.setEnabled(true);
+                            btnRestoreMdm.setEnabled(true);
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private void confirmRestoreMdm() {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.restore_mdm_confirm_title)
+            .setMessage(R.string.restore_mdm_confirm_body)
+            .setPositiveButton(R.string.btn_yes, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface dialog, int which) {
+                    restoreMdm();
+                }
+            })
+            .setNegativeButton(R.string.btn_no, null)
+            .show();
+    }
+
+    private void restoreMdm() {
+        btnRemoveMdm.setEnabled(false);
+        btnRestoreMdm.setEnabled(false);
+        setMdmStatus(getString(R.string.restore_mdm_working));
+
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    MdmRemover.restore(getCacheDir());
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            setMdmStatus(getString(R.string.restore_mdm_failed,
+                                e.getMessage()));
+                            btnRemoveMdm.setEnabled(true);
+                            btnRestoreMdm.setEnabled(true);
+                        }
+                    });
+                }
             }
         }).start();
     }

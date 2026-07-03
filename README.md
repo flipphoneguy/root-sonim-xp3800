@@ -23,6 +23,7 @@ The exploit is serialized with `flock()` to prevent concurrent runs (which would
 - **Persistent root** — `su` is installed to `/system/bin` permanently. No tmpfs, no boot receiver, survives reboots and factory resets.
 - **Writable /system** — The XP3800 has no dm-verity. `/system` is plain ext4, freely remountable read-write. Changes persist across reboots.
 - **Root app installer** — Install APKs and split APKs (XAPK) using root, since the XP3800 blocks app installation without ADB. Also registers as a handler for APK files from file managers.
+- **Remove Verizon MDM** — Strip Verizon's `com.verizon.mdm.basicphone` of device-owner status and disable it (or restore it), with a single button. See [Removing Verizon MDM](docs/mdm-removal.md).
 - **Daemon architecture** — Exploit runs once per boot, daemon handles all subsequent requests. See [The Daemon](docs/daemon.md).
 - **Denylist** — Block specific apps from using `su`. Filter by User/System/All, search by name or package.
 - **Self-update** — Checks GitHub Releases for newer versions and installs via root.
@@ -85,6 +86,7 @@ The exploit and its implementation are documented in detail:
 - [CVE-2019-2215: The Exploit Explained](docs/CVE-2019-2215.md) — The vulnerability, every background concept, and the full escalation chain from UAF through root
 - [The ARM32 Port](docs/arm32-port.md) — What breaks on 32-bit ARM and how it's fixed
 - [The Daemon](docs/daemon.md) — How the daemon provides persistent root without re-running the exploit
+- [Removing Verizon MDM](docs/mdm-removal.md) — How device-owner removal/restore works, and the native-library bug it took to get restore right
 
 ## Disclaimer
 
