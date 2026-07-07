@@ -28,8 +28,6 @@
 
     <!-- Info screen -->
     <string name="info_title">About</string>
-    <string name="info_boot_title">Boot Settings</string>
-    <string name="check_boot">Install root on boot</string>
     <string name="info_update_title">Update</string>
     <string name="info_update_body">Check for a newer version on GitHub.</string>
     <string name="btn_check_update">Check for update</string>

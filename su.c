@@ -531,7 +531,7 @@ static void daemon_handle(int client) {
         return;
     }
 
-    char buf[8192];
+    char buf[65536];
     int fds[3] = {-1, -1, -1};
     struct msghdr msg = {0};
     struct iovec iov = { .iov_base = buf, .iov_len = sizeof(buf) - 1 };
@@ -570,12 +570,23 @@ static void daemon_handle(int client) {
         return;
     }
 
+    char *env_start = memchr(home, 0, end - home);
+    if (env_start) env_start++;
+
     pid_t child = fork();
     if (child == 0) {
         close(client);
         dup2(fds[0], 0); dup2(fds[1], 1); dup2(fds[2], 2);
         close(fds[0]); close(fds[1]); close(fds[2]);
         chdir(cwd);
+        while (env_start && env_start < end && *env_start) {
+            char *eq = memchr(env_start, '=', end - env_start);
+            char *nxt = memchr(env_start, 0, end - env_start);
+            if (!eq || !nxt) break;
+            *eq = '\0';
+            setenv(env_start, eq + 1, 1);
+            env_start = nxt + 1;
+        }
         setenv("PATH", path, 1);
         setenv("TERM", term, 1);
         setenv("HOME", home, 1);
@@ -654,8 +665,8 @@ static int try_connect(void) {
 
 static int client_request(int sock, const char *shell, const char *cmd,
                           const char *cwd, const char *path, const char *term,
-                          const char *home) {
-    char buf[8192];
+                          const char *home, int forward_env) {
+    char buf[65536];
     size_t pos = 0;
     #define PACK(s) do { \
         int r = snprintf(buf + pos, sizeof(buf) - pos, "%s", (s)); \
@@ -668,6 +679,15 @@ static int client_request(int sock, const char *shell, const char *cmd,
     PACK(path ? path : "/system/bin");
     PACK(term ? term : "xterm");
     PACK(home ? home : "/data/local/tmp");
+    if (forward_env) {
+        extern char **environ;
+        for (char **ep = environ; *ep; ep++) {
+            if (!strncmp(*ep, "PATH=", 5)) continue;
+            if (!strncmp(*ep, "TERM=", 5)) continue;
+            if (!strncmp(*ep, "HOME=", 5)) continue;
+            PACK(*ep);
+        }
+    }
     #undef PACK
 
     int fds[3] = {0, 1, 2};
@@ -830,7 +850,7 @@ int main(int argc, char **argv) {
     int sock = try_connect();
     if (sock >= 0) {
         message("connected to daemon");
-        int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home);
+        int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home, preserve_env);
         if (ret == -1) {
             fprintf(stderr, "su: denied\n");
             return 1;
@@ -845,7 +865,7 @@ int main(int argc, char **argv) {
     if (sock >= 0) {
         if (lock_fd >= 0) { flock(lock_fd, LOCK_UN); close(lock_fd); }
         message("connected to daemon (after lock)");
-        int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home);
+        int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home, preserve_env);
         if (ret == -1) {
             fprintf(stderr, "su: denied\n");
             return 1;
@@ -904,7 +924,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home);
+    int ret = client_request(sock, _shell, cmd_arg, _cwd, _path, _term, _home, preserve_env);
     if (ret == -1) {
         fprintf(stderr, "su: denied\n");
         return 1;

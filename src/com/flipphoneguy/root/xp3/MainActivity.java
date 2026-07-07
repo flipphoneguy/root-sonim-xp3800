@@ -226,11 +226,8 @@ public class MainActivity extends Activity {
     }
 
     private void setExecutable(File f) {
-        try {
-            Runtime.getRuntime().exec("chmod 755 " + f.getAbsolutePath()).waitFor();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        f.setReadable(true, false);
+        f.setExecutable(true, false);
     }
 
     // --- File picker for APK/XAPK ---

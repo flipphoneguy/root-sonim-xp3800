@@ -5,13 +5,11 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.SharedPreferences;
+
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -43,17 +41,6 @@ public class InfoActivity extends Activity {
 
         findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { finish(); }
-        });
-
-        // Boot setting
-        final SharedPreferences prefs = getSharedPreferences("config", MODE_PRIVATE);
-        CheckBox checkBoot = (CheckBox) findViewById(R.id.check_boot);
-        checkBoot.setChecked(prefs.getBoolean("boot_enabled", true));
-        checkBoot.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                prefs.edit().putBoolean("boot_enabled", isChecked).apply();
-            }
         });
 
         // Update

@@ -48,11 +48,5 @@
             </intent-filter>
         </activity>
 
-<provider
-            android:name=".ApkFileProvider"
-            android:authorities="com.flipphoneguy.root.xp3.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true" />
-
     </application>
 </manifest>

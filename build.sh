@@ -40,8 +40,6 @@ mkdir -p build/gen build/classes build/dex tmp
 sed -i "s/package=\"[^\"]*\"/package=\"$PKG\"/" AndroidManifest.xml
 sed -i "s/android:versionCode=\"[^\"]*\"/android:versionCode=\"$VERSION_CODE\"/" AndroidManifest.xml
 sed -i "s/android:versionName=\"[^\"]*\"/android:versionName=\"$VERSION\"/" AndroidManifest.xml
-sed -i "s|android:authorities=\"[^\"]*\.fileprovider\"|android:authorities=\"$PKG.fileprovider\"|" AndroidManifest.xml
-
 # --- generate BuildConfig.java --------------------------------------------
 PKG_PATH=$(echo "$PKG" | tr '.' '/')
 mkdir -p "build/gen/$PKG_PATH"
