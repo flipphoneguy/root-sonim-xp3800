@@ -71,11 +71,23 @@ No exploit, no kernel manipulation, no forks beyond the daemon's own child proce
 
 ## The Daemon Process
 
-After the exploit escalates privileges, the same process becomes the daemon. It never exits (until the device reboots or the process is killed).
+After the exploit escalates privileges, the same process becomes the daemon. It never exits (until the device reboots or the process is killed). The daemon can also be started manually with `su --daemon` if it was killed — this requires an existing root context (e.g., ADB root) and skips the exploit entirely.
+
+### OOM Kill Protection
+
+The very first thing the daemon does is protect itself from Android's low-memory killer:
+
+```c
+int oom = open("/proc/self/oom_score_adj", O_WRONLY);
+write(oom, "-1000", 5);
+close(oom);
+```
+
+Setting `oom_score_adj` to `-1000` tells the kernel's OOM killer and Android's `lmkd` to never select this process for killing, regardless of memory pressure. Without this, the daemon could be killed during low-memory conditions, forcing the next `su` invocation to re-run the exploit — each exploit run carries a small risk of kernel panic due to the UAF race condition.
 
 ### Mount Namespace Escape
 
-The first thing the daemon does is escape the app's mount namespace:
+After setting OOM protection, the daemon escapes the app's mount namespace:
 
 ```c
 int nsfd = open("/proc/1/ns/mnt", O_RDONLY);
@@ -122,16 +134,18 @@ while (1) {
 
 The main daemon process sets `signal(SIGCHLD, SIG_IGN)` so finished handler processes are automatically reaped without becoming zombies. Each handler child resets this to `SIG_DFL` so it can properly `waitpid()` on the command it spawns — without this, `waitpid()` would fail because the child process would be auto-reaped before the handler could collect its exit status.
 
+Each handler child also calls `setsid()` to create a new session and `ioctl(0, TIOCSCTTY, 1)` to acquire a controlling terminal. This allows shells like bash to properly manage job control (process groups, foreground/background) without emitting "cannot set terminal process group" warnings.
+
 ---
 
 ## The Client Protocol
 
 ### Message Format
 
-The client sends a single message containing six null-separated strings:
+The client sends a single message containing six required null-separated strings, optionally followed by additional environment variables:
 
 ```
-shell\0cmd\0cwd\0PATH\0TERM\0HOME\0
+shell\0cmd\0cwd\0PATH\0TERM\0HOME\0[KEY=VALUE\0KEY=VALUE\0...]
 ```
 
 | Field | Example | Purpose |
@@ -142,8 +156,11 @@ shell\0cmd\0cwd\0PATH\0TERM\0HOME\0
 | PATH | `/system/bin:/vendor/bin` | PATH environment variable |
 | TERM | `xterm-256color` | Terminal type |
 | HOME | `/data/data/com.termux/files/home` | Home directory |
+| (optional) | `EDITOR=vim`, `LANG=en_US.UTF-8`, ... | Additional env vars (when `--preserve-environment` is used) |
 
 If `cmd` is empty, the daemon spawns an interactive shell (no `-c` flag). If `cmd` is non-empty, the daemon runs `shell -c cmd`.
+
+When `--preserve-environment` (`-p`) is used, the client appends all of the caller's environment variables (except `PATH`, `TERM`, and `HOME`, which are already sent as dedicated fields) as null-separated `KEY=VALUE` pairs after `HOME`. The daemon applies these to the child process with `setenv()` before executing the command.
 
 ### File Descriptor Passing
 
@@ -182,14 +199,16 @@ A special exit code of `-1` indicates the request was denied by the denylist.
 
 The `su` binary sets up environment variables differently depending on how it's invoked:
 
-| Invocation | Shell | PATH | HOME |
-|---|---|---|---|
-| `su` (interactive) | Caller's `$SHELL` | Caller's `$PATH` | Caller's `$HOME` |
-| `su -c cmd` | `/system/bin/sh` | `/sbin:/system/sbin:/system/bin:/system/xbin:/vendor/bin` | `/` |
-| `su -p -c cmd` | Caller's `$SHELL` | Caller's `$PATH` | Caller's `$HOME` |
-| `su -s bash -c cmd` | `bash` | System PATH | `/` |
+| Invocation | Shell | PATH | HOME | Other env vars |
+|---|---|---|---|---|
+| `su` (interactive) | Caller's `$SHELL` | Caller's `$PATH` | Caller's `$HOME` | All forwarded |
+| `su -c cmd` | `/system/bin/sh` | `/sbin:/system/sbin:/system/bin:/system/xbin:/vendor/bin` | `/` | Not forwarded |
+| `su -p -c cmd` | Caller's `$SHELL` | Caller's `$PATH` | Caller's `$HOME` | All forwarded |
+| `su -s bash -c cmd` | `bash` | System PATH | `/` | Not forwarded |
 
-The logic: plain `su` (interactive shell) preserves the caller's environment so the shell feels like the caller's normal environment but with root. `su -c` uses Android system defaults so commands like `mount`, `pm`, and `settings` resolve correctly without depending on the caller's PATH. The `--preserve-environment` (`-p`) flag overrides this default, keeping the caller's environment even with `-c`.
+The logic: plain `su` (interactive shell) preserves the caller's full environment so the shell feels like the caller's normal environment but with root. `su -c` uses Android system defaults so commands like `mount`, `pm`, and `settings` resolve correctly without depending on the caller's PATH. The `--preserve-environment` (`-p`) flag overrides this default, forwarding the caller's entire environment through the daemon protocol.
+
+When environment forwarding is active, all of the caller's environment variables (except `PATH`, `TERM`, and `HOME`, which have their own dedicated fields) are packed into the daemon message as null-separated `KEY=VALUE` pairs. The daemon child applies them with `setenv()` before executing the command.
 
 The `--mount-master` flag is accepted and silently ignored for compatibility with Termux's `sudo` script. The `--shell` (`-s`) flag overrides the shell regardless of other settings.
 

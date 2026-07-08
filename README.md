@@ -23,8 +23,9 @@ The exploit is serialized with `flock()` to prevent concurrent runs (which would
 - **Persistent root** — `su` is installed to `/system/bin` permanently. No tmpfs, no boot receiver, survives reboots and factory resets.
 - **Writable /system** — The XP3800 has no dm-verity. `/system` is plain ext4, freely remountable read-write. Changes persist across reboots.
 - **Root app installer** — Install APKs and split APKs (XAPK) using root, since the XP3800 blocks app installation without ADB. Also registers as a handler for APK files from file managers.
-- **Daemon architecture** — Exploit runs once per boot, daemon handles all subsequent requests. See [The Daemon](docs/daemon.md).
+- **Daemon architecture** — Exploit runs once per boot, daemon handles all subsequent requests. The daemon is protected from Android's low-memory killer (`oom_score_adj = -1000`). See [The Daemon](docs/daemon.md).
 - **Denylist** — Block specific apps from using `su`. Filter by User/System/All, search by name or package.
+- **Install diagnostics** — View install logs and re-run the exploit with verbose logging from the About screen.
 - **Self-update** — Checks GitHub Releases for newer versions and installs via root.
 - **D-pad friendly** — Full keyboard/d-pad navigation with visible focus states.
 
@@ -35,8 +36,10 @@ The exploit is serialized with `flock()` to prevent concurrent runs (which would
 | `su` | Interactive root shell (preserves caller's environment) |
 | `su -c 'cmd'` | Run a command as root (uses system shell and PATH) |
 | `su cmd` | Same as `-c` |
-| `su -p -c 'cmd'` | Run a command preserving the caller's environment |
+| `su -p -c 'cmd'` | Run a command preserving the caller's full environment |
+| `su --preserve-environment -c 'cmd'` | Same as `-p` |
 | `su -s bash -c 'cmd'` | Specify shell |
+| `su --daemon` | Start the root daemon manually (requires root) |
 | `su --mount-master` | Accepted for compatibility (no-op — daemon already has full mount namespace) |
 | `su -v` | Verbose exploit output |
 

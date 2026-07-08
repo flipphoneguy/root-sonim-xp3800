@@ -2,6 +2,8 @@ package com.flipphoneguy.root.xp3;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -10,10 +12,17 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.InputStreamReader;
 
 public class InfoActivity extends Activity {
 
@@ -64,6 +73,14 @@ public class InfoActivity extends Activity {
             @Override public void onClick(View v) {
                 openUrl(BuildConfig.GITHUB_PROFILE + "/" + repoName);
             }
+        });
+
+        // Diagnostics
+        findViewById(R.id.btn_view_log).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { viewInstallLog(); }
+        });
+        findViewById(R.id.btn_reinstall_verbose).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { confirmReinstallVerbose(); }
         });
 
         // Theme
@@ -173,6 +190,134 @@ public class InfoActivity extends Activity {
                 }
             })
             .show();
+    }
+
+    private void viewInstallLog() {
+        File logFile = new File(getFilesDir(), "install.log");
+        if (!logFile.exists()) {
+            Toast.makeText(this, R.string.log_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(logFile));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
+            br.close();
+            final String logText = sb.toString();
+
+            LinearLayout root = new LinearLayout(this);
+            root.setOrientation(LinearLayout.VERTICAL);
+
+            TextView tv = new TextView(this);
+            tv.setText(logText);
+            tv.setTextSize(11);
+            tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+            tv.setPadding(24, 16, 24, 16);
+
+            ScrollView sv = new ScrollView(this);
+            sv.setFocusable(true);
+            sv.setFocusableInTouchMode(true);
+            sv.addView(tv);
+            root.addView(sv, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+            LinearLayout buttons = new LinearLayout(this);
+            buttons.setOrientation(LinearLayout.HORIZONTAL);
+            buttons.setPadding(12, 8, 12, 8);
+            buttons.setGravity(android.view.Gravity.END);
+
+            Button btnCopy = new Button(this);
+            btnCopy.setText(R.string.btn_copy);
+            btnCopy.setFocusable(true);
+            Button btnClose = new Button(this);
+            btnClose.setText(R.string.btn_close);
+            btnClose.setFocusable(true);
+
+            btnCopy.setId(android.R.id.button1);
+            btnClose.setId(android.R.id.button2);
+
+            buttons.addView(btnCopy);
+            buttons.addView(btnClose);
+            root.addView(buttons);
+
+            final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.log_title)
+                .setView(root)
+                .create();
+
+            btnCopy.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(ClipData.newPlainText("install_log", logText));
+                    Toast.makeText(InfoActivity.this, R.string.log_copied, Toast.LENGTH_SHORT).show();
+                }
+            });
+            btnClose.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { dialog.dismiss(); }
+            });
+
+            dialog.show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void confirmReinstallVerbose() {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.reinstall_confirm_title)
+            .setMessage(R.string.reinstall_confirm)
+            .setPositiveButton(R.string.btn_yes, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface dialog, int which) {
+                    reinstallVerbose();
+                }
+            })
+            .setNegativeButton(R.string.btn_no, null)
+            .show();
+    }
+
+    private void reinstallVerbose() {
+        Toast.makeText(this, R.string.reinstalling_verbose, Toast.LENGTH_SHORT).show();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    File script = new File(getFilesDir(), "install.sh");
+                    ProcessBuilder pb = new ProcessBuilder("/system/bin/sh", script.getAbsolutePath(), "-v");
+                    pb.directory(getFilesDir());
+                    pb.redirectErrorStream(true);
+                    Process p = pb.start();
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                    File logFile = new File(getFilesDir(), "launch_error.log");
+                    BufferedWriter writer = new BufferedWriter(new FileWriter(logFile));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        writer.write(line);
+                        writer.newLine();
+                    }
+                    writer.close();
+                    reader.close();
+                    final int exitCode = p.waitFor();
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (exitCode == 0) {
+                                Toast.makeText(InfoActivity.this, R.string.install_success, Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(InfoActivity.this, "Failed: Code " + exitCode, Toast.LENGTH_LONG).show();
+                            }
+                            viewInstallLog();
+                        }
+                    });
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            Toast.makeText(InfoActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        }).start();
     }
 
     private void installUpdate(final File apk) {

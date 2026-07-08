@@ -5,6 +5,9 @@ cd "/data/data/com.flipphoneguy.root.xp3/files" || exit 1
 LOG="install.log"
 DIR=$(pwd)
 
+VERBOSE=""
+[ "$1" = "-v" ] && VERBOSE="-v"
+
 echo "Starting install..." > "$LOG"
 
 {
@@ -16,7 +19,7 @@ echo "Starting install..." > "$LOG"
     /system/bin/chmod 755 su
 
     echo "--- EXPLOIT START ---"
-    ./su -c "
+    ./su $VERBOSE -c "
         echo 'Exploit triggered shell!'
         /system/bin/mount -o remount,rw /system
         /system/bin/cp '$DIR/su' /system/bin/su

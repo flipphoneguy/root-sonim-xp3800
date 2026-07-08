@@ -153,6 +153,44 @@
                     android:text="@string/btn_app_repo"
                     android:layout_marginTop="4dp"
                     android:nextFocusUp="@id/btn_github_profile"
+                    android:nextFocusDown="@+id/btn_view_log" />
+            </LinearLayout>
+
+            <!-- Diagnostics card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:padding="12dp"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/info_diagnostics_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btn_view_log"
+                    style="@style/BtnOutline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/btn_view_log"
+                    android:layout_marginTop="8dp"
+                    android:nextFocusUp="@id/btn_app_repo"
+                    android:nextFocusDown="@+id/btn_reinstall_verbose" />
+
+                <Button
+                    android:id="@+id/btn_reinstall_verbose"
+                    style="@style/BtnOutline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/btn_reinstall_verbose"
+                    android:layout_marginTop="4dp"
+                    android:nextFocusUp="@id/btn_view_log"
                     android:nextFocusDown="@+id/btn_theme" />
             </LinearLayout>
 
@@ -179,7 +217,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:nextFocusUp="@id/btn_app_repo" />
+                    android:nextFocusUp="@id/btn_reinstall_verbose" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>

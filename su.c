@@ -576,8 +576,10 @@ static void daemon_handle(int client) {
     pid_t child = fork();
     if (child == 0) {
         close(client);
+        setsid();
         dup2(fds[0], 0); dup2(fds[1], 1); dup2(fds[2], 2);
         close(fds[0]); close(fds[1]); close(fds[2]);
+        ioctl(0, TIOCSCTTY, 1);
         chdir(cwd);
         while (env_start && env_start < end && *env_start) {
             char *eq = memchr(env_start, '=', end - env_start);
@@ -605,6 +607,9 @@ static void daemon_handle(int client) {
 }
 
 static void daemon_main(int ready_fd) {
+    int oom = open("/proc/self/oom_score_adj", O_WRONLY);
+    if (oom >= 0) { write(oom, "-1000", 5); close(oom); }
+
     int nsfd = open("/proc/1/ns/mnt", O_RDONLY);
     if (nsfd >= 0) {
         setns(nsfd, 0);
@@ -657,6 +662,7 @@ static int try_connect(void) {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
     if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        message("try_connect: %s", strerror(errno));
         close(sock);
         return -1;
     }
@@ -806,10 +812,15 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
             quiet = 0;
         } else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-            printf("Usage: su [OPTIONS] [COMMAND...]\n  su                       root shell\n  su -c 'cmd'              run command as root\n  su cmd                   same as -c\n  -s, --shell SHELL        specify shell\n  -p, --preserve-environment  preserve environment variables\n  --mount-master           mount master namespace\n  -v, --verbose            verbose output\n");
+            printf("Usage: su [OPTIONS] [COMMAND...]\n  su                       root shell\n  su -c 'cmd'              run command as root\n  su cmd                   same as -c\n  -s, --shell SHELL        specify shell\n  -p, --preserve-environment  preserve environment variables\n  --mount-master           mount master namespace\n  --daemon                 start daemon directly (requires root)\n  -v, --verbose            verbose output\n");
             return 0;
         } else if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--preserve-environment")) {
             preserve_env = 1;
+        } else if (!strcmp(argv[i], "--daemon")) {
+            if (getuid() != 0)
+                error("--daemon requires root");
+            daemon_main(-1);
+            _exit(0);
         } else if (!strcmp(argv[i], "--mount-master")) {
             /* accepted for sudo compatibility */
         } else if (!strcmp(argv[i], "-s") || !strcmp(argv[i], "--shell")) {

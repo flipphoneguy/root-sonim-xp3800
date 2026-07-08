@@ -46,6 +46,18 @@
     <string name="update_no_release">No release found</string>
     <string name="update_success">Updated successfully</string>
 
+    <string name="info_diagnostics_title">Diagnostics</string>
+    <string name="btn_view_log">View Install Log</string>
+    <string name="btn_reinstall_verbose">Reinstall (verbose logging)</string>
+    <string name="log_empty">No install log found.</string>
+    <string name="log_title">Install Log</string>
+    <string name="btn_copy">Copy</string>
+    <string name="log_copied">Log copied to clipboard</string>
+    <string name="btn_close">Close</string>
+    <string name="reinstall_confirm">This will re-run the exploit with verbose logging. Verbose mode slightly increases kernel panic risk. Continue?</string>
+    <string name="reinstall_confirm_title">Reinstall (Verbose)</string>
+    <string name="reinstalling_verbose">Reinstalling with verbose logging…</string>
+
     <string name="info_theme_title">Theme</string>
     <string name="theme_system">System Default</string>
     <string name="theme_light">Light</string>
