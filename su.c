@@ -579,7 +579,7 @@ static void daemon_handle(int client) {
         setsid();
         dup2(fds[0], 0); dup2(fds[1], 1); dup2(fds[2], 2);
         close(fds[0]); close(fds[1]); close(fds[2]);
-        ioctl(0, TIOCSCTTY, 1);
+        ioctl(0, TIOCSCTTY, 0);
         chdir(cwd);
         while (env_start && env_start < end && *env_start) {
             char *eq = memchr(env_start, '=', end - env_start);
@@ -819,6 +819,8 @@ int main(int argc, char **argv) {
         } else if (!strcmp(argv[i], "--daemon")) {
             if (getuid() != 0)
                 error("--daemon requires root");
+            { int s = try_connect(); if (s >= 0) { close(s); error("daemon already running"); } }
+            { pid_t p = fork(); if (p < 0) error("fork"); if (p > 0) _exit(0); }
             daemon_main(-1);
             _exit(0);
         } else if (!strcmp(argv[i], "--mount-master")) {

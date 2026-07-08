@@ -134,7 +134,7 @@ while (1) {
 
 The main daemon process sets `signal(SIGCHLD, SIG_IGN)` so finished handler processes are automatically reaped without becoming zombies. Each handler child resets this to `SIG_DFL` so it can properly `waitpid()` on the command it spawns — without this, `waitpid()` would fail because the child process would be auto-reaped before the handler could collect its exit status.
 
-Each handler child also calls `setsid()` to create a new session and `ioctl(0, TIOCSCTTY, 1)` to acquire a controlling terminal. This allows shells like bash to properly manage job control (process groups, foreground/background) without emitting "cannot set terminal process group" warnings.
+Each handler child also calls `setsid()` to create a new session and `ioctl(0, TIOCSCTTY, 0)` to acquire the client's terminal as its controlling terminal (without stealing it from the client's session). When the terminal is not owned by another session (e.g., commands invoked from app processes rather than interactive shells), this gives the child proper job control. When the terminal is already owned (e.g., Termux), the ioctl harmlessly fails and the child runs without a controlling terminal.
 
 ---
 
@@ -201,12 +201,12 @@ The `su` binary sets up environment variables differently depending on how it's 
 
 | Invocation | Shell | PATH | HOME | Other env vars |
 |---|---|---|---|---|
-| `su` (interactive) | Caller's `$SHELL` | Caller's `$PATH` | Caller's `$HOME` | All forwarded |
+| `su` (interactive) | Caller's `$SHELL` | Caller's `$PATH` | Caller's `$HOME` | Not forwarded |
 | `su -c cmd` | `/system/bin/sh` | `/sbin:/system/sbin:/system/bin:/system/xbin:/vendor/bin` | `/` | Not forwarded |
 | `su -p -c cmd` | Caller's `$SHELL` | Caller's `$PATH` | Caller's `$HOME` | All forwarded |
 | `su -s bash -c cmd` | `bash` | System PATH | `/` | Not forwarded |
 
-The logic: plain `su` (interactive shell) preserves the caller's full environment so the shell feels like the caller's normal environment but with root. `su -c` uses Android system defaults so commands like `mount`, `pm`, and `settings` resolve correctly without depending on the caller's PATH. The `--preserve-environment` (`-p`) flag overrides this default, forwarding the caller's entire environment through the daemon protocol.
+The logic: plain `su` (interactive shell) uses the caller's shell, PATH, and HOME so the shell feels familiar, but does not forward the rest of the caller's environment. `su -c` uses Android system defaults so commands like `mount`, `pm`, and `settings` resolve correctly without depending on the caller's PATH. The `--preserve-environment` (`-p`) flag forwards the caller's entire environment through the daemon protocol — use this when commands need env vars like `EDITOR`, `LANG`, or `LD_LIBRARY_PATH`.
 
 When environment forwarding is active, all of the caller's environment variables (except `PATH`, `TERM`, and `HOME`, which have their own dedicated fields) are packed into the daemon message as null-separated `KEY=VALUE` pairs. The daemon child applies them with `setenv()` before executing the command.
 
