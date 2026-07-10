@@ -96,7 +96,54 @@
                     android:layout_height="wrap_content"
                     android:text="@string/btn_install_apk"
                     android:nextFocusUp="@id/status_card"
+                    android:nextFocusDown="@+id/btn_remove_mdm" />
+            </LinearLayout>
+
+            <!-- Remove Verizon MDM Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:padding="10dp"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/info_mdm_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="6dp" />
+
+                <Button
+                    android:id="@+id/btn_remove_mdm"
+                    style="@style/BtnPrimary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/btn_remove_mdm"
+                    android:nextFocusUp="@id/btn_install_apk"
+                    android:nextFocusDown="@+id/btn_restore_mdm" />
+
+                <Button
+                    android:id="@+id/btn_restore_mdm"
+                    style="@style/BtnOutline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/btn_restore_mdm"
+                    android:layout_marginTop="4dp"
+                    android:nextFocusUp="@id/btn_remove_mdm"
                     android:nextFocusDown="@+id/searchBox" />
+
+                <TextView
+                    android:id="@+id/mdm_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginTop="4dp"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <!-- Blacklist Card -->
@@ -128,7 +175,7 @@
                     android:imeOptions="actionSearch"
                     android:inputType="text"
                     android:minHeight="36dp"
-                    android:nextFocusUp="@id/btn_install_apk"
+                    android:nextFocusUp="@id/btn_restore_mdm"
                     android:nextFocusDown="@+id/filter_user" />
 
                 <!-- Filter buttons -->
