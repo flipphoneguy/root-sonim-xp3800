@@ -23,15 +23,11 @@
     <!-- Verizon MDM -->
     <string name="info_mdm_title">Verizon MDM</string>
     <string name="btn_remove_mdm">Remove Verizon MDM</string>
-    <string name="remove_mdm_confirm_title">Remove Verizon MDM?</string>
-    <string name="remove_mdm_confirm_body">This disables the Verizon MDM app and clears device owner policies. The phone will reboot immediately to apply the change. Continue?</string>
-    <string name="remove_mdm_working">Removing\u2026 device will reboot shortly.</string>
-    <string name="remove_mdm_failed">Removal failed: %s</string>
     <string name="btn_restore_mdm">Restore Verizon MDM</string>
-    <string name="restore_mdm_confirm_title">Restore Verizon MDM?</string>
-    <string name="restore_mdm_confirm_body">This re-enables the Verizon MDM app and restores it as device owner, undoing a previous removal. The phone will reboot immediately to apply the change. Continue?</string>
-    <string name="restore_mdm_working">Restoring\u2026 device will reboot shortly.</string>
+    <string name="remove_mdm_failed">Removal failed: %s</string>
     <string name="restore_mdm_failed">Restore failed: %s</string>
+    <string name="mdm_removed">Verizon MDM removed. Reboot to fully apply.</string>
+    <string name="mdm_restored">Verizon MDM restored. Reboot to fully apply.</string>
 
     <!-- Install handler -->
     <string name="install_confirm_title">Install Package</string>
