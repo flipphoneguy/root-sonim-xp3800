@@ -23,7 +23,7 @@ The exploit is serialized with `flock()` to prevent concurrent runs (which would
 - **Persistent root** — `su` is installed to `/system/bin` permanently. No tmpfs, no boot receiver, survives reboots and factory resets.
 - **Writable /system** — The XP3800 has no dm-verity. `/system` is plain ext4, freely remountable read-write. Changes persist across reboots.
 - **Root app installer** — Install APKs and split APKs (XAPK) using root, since the XP3800 blocks app installation without ADB. Also registers as a handler for APK files from file managers.
-- **Remove Verizon MDM** — Strip Verizon's `com.verizon.mdm.basicphone` of device-owner status and disable it (or restore it). See [Removing Verizon MDM](docs/mdm-removal.md).
+- **Remove Verizon MDM** — Strip Verizon's `com.verizon.mdm.basicphone` of device-owner status and disable it (or restore it). See [Removing Verizon MDM](docs/mdm-removal.md). Credits: [@anonymousfliphones](https://github.com/anonymousfliphones)
 - **Daemon architecture** — Exploit runs once per boot, daemon handles all subsequent requests. The daemon is protected from Android's low-memory killer (`oom_score_adj = -1000`). See [The Daemon](docs/daemon.md).
 - **Denylist** — Block specific apps from using `su`. Filter by User/System/All, search by name or package.
 - **Install diagnostics** — View install logs and re-run the exploit with verbose logging from the About screen.
