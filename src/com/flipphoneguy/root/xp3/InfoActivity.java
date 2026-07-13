@@ -28,7 +28,6 @@ public class InfoActivity extends Activity {
 
     private Button btnUpdate;
     private TextView updateStatus;
-
     private static final String[] THEME_LABELS = new String[3];
 
     @Override

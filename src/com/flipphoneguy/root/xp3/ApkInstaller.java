@@ -304,7 +304,7 @@ public final class ApkInstaller {
 
     // --- Helpers ---
 
-    private static String readStream(InputStream is) throws IOException {
+    static String readStream(InputStream is) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
         StringBuilder sb = new StringBuilder();
         String line;

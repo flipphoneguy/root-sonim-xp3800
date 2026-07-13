@@ -96,6 +96,35 @@
                     android:layout_height="wrap_content"
                     android:text="@string/btn_install_apk"
                     android:nextFocusUp="@id/status_card"
+                    android:nextFocusDown="@+id/btn_mdm_toggle" />
+            </LinearLayout>
+
+            <!-- Verizon MDM card -->
+            <LinearLayout
+                android:id="@+id/mdm_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:padding="10dp"
+                android:layout_marginBottom="6dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/info_mdm_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btn_mdm_toggle"
+                    style="@style/BtnOutline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:nextFocusUp="@id/btn_install_apk"
                     android:nextFocusDown="@+id/searchBox" />
             </LinearLayout>
 

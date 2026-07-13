@@ -24,7 +24,7 @@
             android:textColor="@color/text_on_primary"
             android:background="@drawable/btn_header"
             android:focusable="true"
-            android:nextFocusDown="@+id/check_boot" />
+            android:nextFocusDown="@+id/btn_check_update" />
 
         <TextView
             android:layout_width="0dp"
