@@ -44,6 +44,7 @@ public class MainActivity extends Activity {
     private static final int FILTER_ALL = 2;
 
     private TextView statusText;
+    private Button btnMdmToggle;
     private EditText searchBox;
     private LinearLayout appListContainer;
     private TextView appsEmpty;
@@ -96,6 +97,18 @@ public class MainActivity extends Activity {
                 openFilePicker();
             }
         });
+
+        // Verizon MDM
+        btnMdmToggle = (Button) findViewById(R.id.btn_mdm_toggle);
+        if (MdmRemover.isVerizonDevice(this)) {
+            findViewById(R.id.mdm_card).setVisibility(View.VISIBLE);
+            updateMdmButton();
+            btnMdmToggle.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    toggleMdm();
+                }
+            });
+        }
 
         findViewById(R.id.btn_info).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
@@ -395,6 +408,53 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Toast.makeText(this, "Error saving blacklist", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    // --- Verizon MDM ---
+
+    private void updateMdmButton() {
+        btnMdmToggle.setText(MdmRemover.isRemoved(this)
+            ? R.string.btn_restore_mdm : R.string.btn_remove_mdm);
+    }
+
+    private void toggleMdm() {
+        if (MdmRemover.findSu() == null) {
+            Toast.makeText(this, R.string.no_root, Toast.LENGTH_LONG).show();
+            return;
+        }
+        final boolean removing = !MdmRemover.isRemoved(this);
+        btnMdmToggle.setEnabled(false);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    if (removing)
+                        MdmRemover.remove(MainActivity.this);
+                    else
+                        MdmRemover.restore(MainActivity.this);
+
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            Toast.makeText(MainActivity.this,
+                                removing ? R.string.mdm_removed : R.string.mdm_restored,
+                                Toast.LENGTH_LONG).show();
+                            updateMdmButton();
+                            btnMdmToggle.setEnabled(true);
+                        }
+                    });
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            Toast.makeText(MainActivity.this,
+                                getString(removing
+                                    ? R.string.remove_mdm_failed : R.string.restore_mdm_failed,
+                                    e.getMessage()),
+                                Toast.LENGTH_LONG).show();
+                            btnMdmToggle.setEnabled(true);
+                        }
+                    });
+                }
+            }
+        }).start();
     }
 
     // --- App item ---

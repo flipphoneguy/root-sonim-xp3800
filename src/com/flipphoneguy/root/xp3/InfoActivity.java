@@ -28,8 +28,6 @@ public class InfoActivity extends Activity {
 
     private Button btnUpdate;
     private TextView updateStatus;
-    private Button btnMdmToggle;
-
     private static final String[] THEME_LABELS = new String[3];
 
     @Override
@@ -52,18 +50,6 @@ public class InfoActivity extends Activity {
         findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { finish(); }
         });
-
-        // Verizon MDM
-        btnMdmToggle = (Button) findViewById(R.id.btn_mdm_toggle);
-        if (MdmRemover.isVerizonDevice(this)) {
-            findViewById(R.id.mdm_card).setVisibility(View.VISIBLE);
-            updateMdmButton();
-            btnMdmToggle.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    toggleMdm();
-                }
-            });
-        }
 
         // Update
         btnUpdate = (Button) findViewById(R.id.btn_check_update);
@@ -326,53 +312,6 @@ public class InfoActivity extends Activity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             Toast.makeText(InfoActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        }
-                    });
-                }
-            }
-        }).start();
-    }
-
-    // --- Verizon MDM ---
-
-    private void updateMdmButton() {
-        btnMdmToggle.setText(MdmRemover.isRemoved(this)
-            ? R.string.btn_restore_mdm : R.string.btn_remove_mdm);
-    }
-
-    private void toggleMdm() {
-        if (MdmRemover.findSu() == null) {
-            Toast.makeText(this, R.string.no_root, Toast.LENGTH_LONG).show();
-            return;
-        }
-        final boolean removing = !MdmRemover.isRemoved(this);
-        btnMdmToggle.setEnabled(false);
-        new Thread(new Runnable() {
-            @Override public void run() {
-                try {
-                    if (removing)
-                        MdmRemover.remove(InfoActivity.this);
-                    else
-                        MdmRemover.restore(InfoActivity.this);
-
-                    runOnUiThread(new Runnable() {
-                        @Override public void run() {
-                            Toast.makeText(InfoActivity.this,
-                                removing ? R.string.mdm_removed : R.string.mdm_restored,
-                                Toast.LENGTH_LONG).show();
-                            updateMdmButton();
-                            btnMdmToggle.setEnabled(true);
-                        }
-                    });
-                } catch (final Exception e) {
-                    runOnUiThread(new Runnable() {
-                        @Override public void run() {
-                            Toast.makeText(InfoActivity.this,
-                                getString(removing
-                                    ? R.string.remove_mdm_failed : R.string.restore_mdm_failed,
-                                    e.getMessage()),
-                                Toast.LENGTH_LONG).show();
-                            btnMdmToggle.setEnabled(true);
                         }
                     });
                 }

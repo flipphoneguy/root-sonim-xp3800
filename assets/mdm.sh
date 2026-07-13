@@ -27,6 +27,7 @@ remove() {
     fi
 
     pm disable "$PACKAGE" 2>/dev/null || true
+    pm hide "$PACKAGE" 2>/dev/null || true
 
     mount -o ro,remount /system
     sync
@@ -52,6 +53,7 @@ restore() {
     fi
 
     pm enable "$PACKAGE" 2>/dev/null || true
+    pm unhide "$PACKAGE" 2>/dev/null || true
 
     mount -o ro,remount /system
     sync

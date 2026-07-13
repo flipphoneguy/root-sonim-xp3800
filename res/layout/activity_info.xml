@@ -24,7 +24,7 @@
             android:textColor="@color/text_on_primary"
             android:background="@drawable/btn_header"
             android:focusable="true"
-            android:nextFocusDown="@+id/btn_mdm_toggle" />
+            android:nextFocusDown="@+id/btn_check_update" />
 
         <TextView
             android:layout_width="0dp"
@@ -73,35 +73,6 @@
                     android:layout_marginTop="2dp" />
             </LinearLayout>
 
-            <!-- Verizon MDM card -->
-            <LinearLayout
-                android:id="@+id/mdm_card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/card_bg"
-                android:padding="12dp"
-                android:layout_marginBottom="6dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/info_mdm_title"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <Button
-                    android:id="@+id/btn_mdm_toggle"
-                    style="@style/BtnOutline"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:nextFocusUp="@id/btn_back"
-                    android:nextFocusDown="@+id/btn_check_update" />
-            </LinearLayout>
-
             <!-- Update card -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -134,7 +105,7 @@
                     android:layout_height="wrap_content"
                     android:text="@string/btn_check_update"
                     android:layout_marginTop="8dp"
-                    android:nextFocusUp="@id/btn_mdm_toggle"
+                    android:nextFocusUp="@id/btn_back"
                     android:nextFocusDown="@+id/btn_github_profile" />
 
                 <TextView
