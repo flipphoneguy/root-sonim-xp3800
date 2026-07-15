@@ -2,7 +2,7 @@
 
 Verizon ships the XP3800 with `com.verizon.mdm.basicphone` as Android **Device Owner** — the highest privilege level an app can hold short of the OS itself. As device owner it can silently install/remove apps, block settings, and manage the phone like an enterprise MDM.
 
-The app provides a toggle in the About screen to remove or restore device-owner status. The card only appears on Verizon devices (detected via `PackageManager`).
+The app provides a toggle to remove or restore device-owner status. The card only appears on Verizon devices (detected via `PackageManager`).
 
 ---
 
@@ -38,7 +38,8 @@ Both `.rc` files are identical — duplicated across Android's two init-script s
 4. Overwrites `/data/system/device_owner_2.xml` with an empty `<root/>` document — `DevicePolicyManagerService` reads this at boot and sees no device owner.
 5. Renames `/data/system/device_policies.xml` to `.bak` (orphaned policy state).
 6. Runs `pm disable` on the MDM package.
-7. Remounts `/system` read-only, syncs.
+7. Runs `pm hide` on the MDM package to hide it from the app drawer.
+8. Remounts `/system` read-only, syncs.
 
 Every rename is guarded with `[ -f X ] && [ ! -f X.bak ]` so re-running is a no-op. The script runs with `set -e` and a trap that remounts `/system` read-only on any exit, so a partial failure doesn't leave `/system` writable.
 
