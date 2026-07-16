@@ -54,6 +54,7 @@ Every rename is guarded with `[ -f X ] && [ ! -f X.bak ]` so re-running is a no-
 3. Renames all `.bak` files back to their original names.
 4. Copies the restored `/system/etc/device_owner_2.xml` to `/data/system/device_owner_2.xml`.
 5. Runs `pm enable` on the MDM package.
-6. Remounts read-only, syncs.
+6. Runs `pm unhide` on the MDM package to put it back in the app drawer.
+7. Remounts read-only, syncs.
 
 After restore and reboot, the device is identical to one that was never modified.
